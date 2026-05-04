@@ -11,6 +11,16 @@ terraform {
 
 provider "aws" {
   region = var.aws_region
+
+  endpoints {
+    ecr = "http://localhost:4566"
+    ecs = "http://localhost:4566"
+    ec2 = "http://localhost:4566"
+  }
+
+  skip_credentials_validation = true
+  skip_metadata_api_check     = true
+  skip_requesting_account_id  = true
 }
 
 data "aws_availability_zones" "available" {
@@ -30,9 +40,9 @@ data "aws_ami" "amazon_linux_2" {
 locals {
   common_tags = merge(
     {
-      Project     = "innovatech-lift-shift-poc"
-      Company     = "Innovatech Chile"
-      Environment = var.environment
+      Proyecto    = "DevOps-"
+      Ambiente    = var.environment
+      Owner       = "Emilio Hormazabal"
       ManagedBy   = "Terraform"
     },
     var.extra_tags
@@ -162,6 +172,14 @@ resource "aws_security_group" "sg_front" {
   }
 
   ingress {
+    description = "HTTPS desde internet"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
     description = "SSH restringido"
     from_port   = 22
     to_port     = 22
@@ -187,9 +205,9 @@ resource "aws_security_group" "sg_back" {
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description     = "Trafico de aplicacion desde frontend"
-    from_port       = 0
-    to_port         = 65535
+    description     = "Trafico de aplicacion desde frontend puerto 8080"
+    from_port       = 8080
+    to_port         = 8080
     protocol        = "tcp"
     security_groups = [aws_security_group.sg_front.id]
   }
@@ -232,109 +250,131 @@ resource "aws_security_group" "sg_data" {
 }
 
 # ----------------------------------------------------
-# Launch Templates
+# ECR Repositories
 # ----------------------------------------------------
-resource "aws_launch_template" "lt_front" {
-  name_prefix   = "${var.project_name}-lt-front-"
-  image_id      = data.aws_ami.amazon_linux_2.id
-  instance_type = var.instance_type
-  key_name      = var.key_name
-
-  network_interfaces {
-    subnet_id                   = aws_subnet.public_frontend.id
-    associate_public_ip_address = true
-    security_groups             = [aws_security_group.sg_front.id]
-  }
-
-  user_data = filebase64("${path.module}/scripts/frontend.sh")
-
-  tag_specifications {
-    resource_type = "instance"
-    tags = merge(local.common_tags, {
-      Name = "${var.project_name}-front"
-      Tier = "frontend"
-    })
-  }
-}
-
-resource "aws_launch_template" "lt_back" {
-  name_prefix   = "${var.project_name}-lt-back-"
-  image_id      = data.aws_ami.amazon_linux_2.id
-  instance_type = var.instance_type
-  key_name      = var.key_name
-
-  network_interfaces {
-    subnet_id                   = aws_subnet.private_backend_data.id
-    associate_public_ip_address = false
-    security_groups             = [aws_security_group.sg_back.id]
-  }
-
-  user_data = filebase64("${path.module}/scripts/backend.sh")
-
-  tag_specifications {
-    resource_type = "instance"
-    tags = merge(local.common_tags, {
-      Name = "${var.project_name}-back"
-      Tier = "backend"
-    })
-  }
-}
-
-resource "aws_launch_template" "lt_data" {
-  name_prefix   = "${var.project_name}-lt-data-"
-  image_id      = data.aws_ami.amazon_linux_2.id
-  instance_type = var.instance_type
-  key_name      = var.key_name
-
-  network_interfaces {
-    subnet_id                   = aws_subnet.private_backend_data.id
-    associate_public_ip_address = false
-    security_groups             = [aws_security_group.sg_data.id]
-  }
-
-  user_data = filebase64("${path.module}/scripts/data.sh")
-
-  tag_specifications {
-    resource_type = "instance"
-    tags = merge(local.common_tags, {
-      Name = "${var.project_name}-data"
-      Tier = "data"
-    })
-  }
-}
-
-# ----------------------------------------------------
-# EC2
-# ----------------------------------------------------
-resource "aws_instance" "frontend" {
-  launch_template {
-    id      = aws_launch_template.lt_front.id
-    version = "$Latest"
-  }
+resource "aws_ecr_repository" "frontend" {
+  name         = "${var.project_name}-frontend"
+  force_delete = var.ecr_force_delete
 
   tags = merge(local.common_tags, {
-    Name = "${var.project_name}-frontend-instance"
+    Name = "${var.project_name}-ecr-frontend"
   })
 }
 
-resource "aws_instance" "backend" {
-  launch_template {
-    id      = aws_launch_template.lt_back.id
-    version = "$Latest"
-  }
+resource "aws_ecr_repository" "backend" {
+  name         = "${var.project_name}-backend"
+  force_delete = var.ecr_force_delete
 
   tags = merge(local.common_tags, {
-    Name = "${var.project_name}-backend-instance"
+    Name = "${var.project_name}-ecr-backend"
   })
 }
 
-resource "aws_instance" "data" {
-  launch_template {
-    id      = aws_launch_template.lt_data.id
-    version = "$Latest"
+# ----------------------------------------------------
+# ECS Cluster
+# ----------------------------------------------------
+resource "aws_ecs_cluster" "main" {
+  name = "${var.project_name}-cluster"
+
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-ecs-cluster"
+  })
+}
+
+# ----------------------------------------------------
+# ECS Task Definitions
+# ----------------------------------------------------
+resource "aws_ecs_task_definition" "frontend" {
+  family                   = "${var.project_name}-frontend"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = var.ecs_cpu
+  memory                   = var.ecs_memory
+  execution_role_arn       = "arn:aws:iam::000000000000:role/ecsTaskExecutionRole"
+  task_role_arn            = "arn:aws:iam::000000000000:role/ecsTaskExecutionRole"
+
+  container_definitions = jsonencode([
+    {
+      name      = "frontend"
+      image     = "${aws_ecr_repository.frontend.repository_url}:latest"
+      essential = true
+      portMappings = [
+        {
+          containerPort = var.container_port_frontend
+          protocol      = "tcp"
+        }
+      ]
+    }
+  ])
+
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-task-frontend"
+  })
+}
+
+resource "aws_ecs_task_definition" "backend" {
+  family                   = "${var.project_name}-backend"
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = var.ecs_cpu
+  memory                   = var.ecs_memory
+  execution_role_arn       = "arn:aws:iam::000000000000:role/ecsTaskExecutionRole"
+  task_role_arn            = "arn:aws:iam::000000000000:role/ecsTaskExecutionRole"
+
+  container_definitions = jsonencode([
+    {
+      name      = "backend"
+      image     = "${aws_ecr_repository.backend.repository_url}:latest"
+      essential = true
+      portMappings = [
+        {
+          containerPort = var.container_port_backend
+          protocol      = "tcp"
+        }
+      ]
+    }
+  ])
+
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-task-backend"
+  })
+}
+
+# ----------------------------------------------------
+# ECS Services
+# ----------------------------------------------------
+resource "aws_ecs_service" "frontend" {
+  name            = "${var.project_name}-frontend-service"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.frontend.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets          = [aws_subnet.public_frontend.id]
+    security_groups  = [aws_security_group.sg_front.id]
+    assign_public_ip = true
   }
 
   tags = merge(local.common_tags, {
-    Name = "${var.project_name}-data-instance"
+    Name = "${var.project_name}-service-frontend"
+  })
+}
+
+resource "aws_ecs_service" "backend" {
+  name            = "${var.project_name}-backend-service"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.backend.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets          = [aws_subnet.private_backend_data.id]
+    security_groups  = [aws_security_group.sg_back.id]
+    assign_public_ip = false
+  }
+
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-service-backend"
   })
 }

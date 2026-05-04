@@ -7,13 +7,13 @@ variable "aws_region" {
 variable "project_name" {
   description = "Prefijo del nombre de proyecto para nombrar recursos."
   type        = string
-  default     = "innovatech-poc"
+  default     = "DevOps-"
 }
 
 variable "environment" {
   description = "Etiqueta de entorno."
   type        = string
-  default     = "poc"
+  default     = "Local-MiniStack"
 }
 
 variable "vpc_cidr" {
@@ -61,7 +61,7 @@ variable "ssh_allowed_cidr" {
 variable "database_port" {
   description = "Puerto de base de datos expuesto por SG Data (5432 PostgreSQL o 3306 MySQL)."
   type        = number
-  default     = 5432
+  default     = 3306
 
   validation {
     condition     = contains([3306, 5432], var.database_port)
@@ -75,14 +75,32 @@ variable "extra_tags" {
   default     = {}
 }
 
-variable "create_iam_resources" {
-  description = "Si es true, Terraform crea rol/politica/profile IAM para EC2. Si es false, usar existing_instance_profile_arn."
+variable "ecr_force_delete" {
+  description = "Permite eliminar repositorios ECR con imagenes."
   type        = bool
   default     = true
 }
 
-variable "existing_instance_profile" {
-  description = "Instance Profile existente para EC2 cuando create_iam_resources=false. Puede ser ARN o nombre."
+variable "ecs_cpu" {
+  description = "CPU para las Task Definitions de ECS (Fargate)."
   type        = string
-  default     = null
+  default     = "256"
+}
+
+variable "ecs_memory" {
+  description = "Memoria para las Task Definitions de ECS (Fargate)."
+  type        = string
+  default     = "512"
+}
+
+variable "container_port_frontend" {
+  description = "Puerto expuesto por el contenedor frontend."
+  type        = number
+  default     = 80
+}
+
+variable "container_port_backend" {
+  description = "Puerto expuesto por el contenedor backend."
+  type        = number
+  default     = 8080
 }

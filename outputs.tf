@@ -13,19 +13,29 @@ output "private_subnet_id" {
   value       = aws_subnet.private_backend_data.id
 }
 
-output "frontend_public_ip" {
-  description = "Direccion IP publica de la instancia EC2 frontend."
-  value       = aws_instance.frontend.public_ip
+output "ecr_frontend_url" {
+  description = "URL del repositorio ECR frontend en MiniStack."
+  value       = aws_ecr_repository.frontend.repository_url
 }
 
-output "backend_private_ip" {
-  description = "Direccion IP privada de la instancia EC2 backend."
-  value       = aws_instance.backend.private_ip
+output "ecr_backend_url" {
+  description = "URL del repositorio ECR backend en MiniStack."
+  value       = aws_ecr_repository.backend.repository_url
 }
 
-output "data_private_ip" {
-  description = "Direccion IP privada de la instancia EC2 data."
-  value       = aws_instance.data.private_ip
+output "ecs_cluster_name" {
+  description = "Nombre del cluster ECS."
+  value       = aws_ecs_cluster.main.name
+}
+
+output "ecs_service_frontend" {
+  description = "Nombre del servicio ECS frontend."
+  value       = aws_ecs_service.frontend.name
+}
+
+output "ecs_service_backend" {
+  description = "Nombre del servicio ECS backend."
+  value       = aws_ecs_service.backend.name
 }
 
 output "security_group_ids" {
