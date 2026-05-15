@@ -21,7 +21,7 @@ resource "aws_ecs_task_definition" "frontend" {
   family                   = "${var.project_name}-frontend"
   network_mode             = "awsvpc"
   requires_compatibilities = ["EC2"]
-  execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
+  execution_role_arn       = data.aws_iam_role.lab_role.arn
   cpu                      = "256"
   memory                   = "512"
 
@@ -62,7 +62,7 @@ resource "aws_ecs_task_definition" "back_ventas" {
   family                   = "${var.project_name}-back-ventas"
   network_mode             = "awsvpc"
   requires_compatibilities = ["EC2"]
-  execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
+  execution_role_arn       = data.aws_iam_role.lab_role.arn
   cpu                      = "256"
   memory                   = "512"
 
@@ -113,7 +113,7 @@ resource "aws_ecs_task_definition" "back_despachos" {
   family                   = "${var.project_name}-back-despachos"
   network_mode             = "awsvpc"
   requires_compatibilities = ["EC2"]
-  execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
+  execution_role_arn       = data.aws_iam_role.lab_role.arn
   cpu                      = "256"
   memory                   = "512"
 
