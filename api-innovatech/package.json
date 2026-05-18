@@ -1,0 +1,22 @@
+{
+  "name": "api-innovatech",
+  "version": "1.0.0",
+  "description": "API REST de ventas y despachos para Innovatech Chile",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "keywords": ["api", "rest", "innovatech", "docker"],
+  "author": "Innovatech Chile",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "express": "^4.18.2",
+    "dotenv": "^16.4.5",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}

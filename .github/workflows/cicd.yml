@@ -1,0 +1,144 @@
+name: CI/CD Innovatech Chile
+
+on:
+  push:
+    branches:
+      - deploy
+
+env:
+  AWS_REGION: us-east-1
+  ECS_CLUSTER: innovatech-poc-cluster
+
+jobs:
+
+  # ------------------------------------------------------------
+  # JOB 1: Build y Push — Frontend (React + Vite + Nginx)
+  # ------------------------------------------------------------
+  build-and-push-frontend:
+    name: Build y Push Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login en Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build y Push imagen Frontend
+        run: |
+          docker build --platform linux/amd64 \
+            -t ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/innovatech-poc-frontend:latest \
+            ./front_despacho
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/innovatech-poc-frontend:latest
+
+  # ------------------------------------------------------------
+  # JOB 2: Build y Push — Backend Ventas (Spring Boot)
+  # ------------------------------------------------------------
+  build-and-push-back-ventas:
+    name: Build y Push Backend Ventas
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login en Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build y Push imagen Backend Ventas
+        run: |
+          docker build --platform linux/amd64 \
+            -t ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/innovatech-poc-back-ventas:latest \
+            ./back-Ventas_SpringBoot/Springboot-API-REST
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/innovatech-poc-back-ventas:latest
+
+  # ------------------------------------------------------------
+  # JOB 3: Build y Push — Backend Despachos (Spring Boot)
+  # ------------------------------------------------------------
+  build-and-push-back-despachos:
+    name: Build y Push Backend Despachos
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login en Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build y Push imagen Backend Despachos
+        run: |
+          docker build --platform linux/amd64 \
+            -t ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/innovatech-poc-back-despachos:latest \
+            ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/innovatech-poc-back-despachos:latest
+
+  # ------------------------------------------------------------
+  # JOB 4: Deploy — Redespliegue en ECS
+  # Solo se ejecuta si los 3 jobs anteriores terminaron bien
+  # ------------------------------------------------------------
+  deploy:
+    name: Redespliegue en ECS
+    runs-on: ubuntu-latest
+    needs:
+      - build-and-push-frontend
+      - build-and-push-back-ventas
+      - build-and-push-back-despachos
+
+    steps:
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Redesplegar servicio Frontend en ECS
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service innovatech-poc-svc-frontend \
+            --force-new-deployment
+
+      - name: Redesplegar servicio Backend Ventas en ECS
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service innovatech-poc-svc-back-ventas \
+            --force-new-deployment
+
+      - name: Redesplegar servicio Backend Despachos en ECS
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service innovatech-poc-svc-back-despachos \
+            --force-new-deployment

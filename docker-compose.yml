@@ -1,0 +1,69 @@
+version: '3.9'
+
+services:
+
+  # ── Base de datos MySQL ──────────────────────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: innovatech-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root1234
+      MYSQL_DATABASE: innovatech_db
+      MYSQL_USER: innovatech
+      MYSQL_PASSWORD: innova1234
+    ports:
+      - "3306:3306"
+    volumes:
+      # Persistencia de datos: los datos sobreviven al reinicio del contenedor
+      - mysql_data:/var/lib/mysql
+
+  # ── Backend Ventas (Spring Boot, puerto 8080) ────────────────────────────────
+  back-ventas:
+    build: ./back-Ventas_SpringBoot/Springboot-API-REST
+    container_name: innovatech-back-ventas
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      DB_ENDPOINT: mysql
+      DB_PORT: 3306
+      DB_NAME: innovatech_db
+      DB_USERNAME: innovatech
+      DB_PASSWORD: innova1234
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/innovatech_db?useSSL=false&serverTimezone=UTC&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true"
+    depends_on:
+      - mysql
+
+  # ── Backend Despachos (Spring Boot, puerto 8081) ─────────────────────────────
+  back-despachos:
+    build: ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
+    container_name: innovatech-back-despachos
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      DB_ENDPOINT: mysql
+      DB_PORT: 3306
+      DB_NAME: innovatech_db
+      DB_USERNAME: innovatech
+      DB_PASSWORD: innova1234
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/innovatech_db?useSSL=false&serverTimezone=UTC&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true"
+    depends_on:
+      - mysql
+
+  # ── Frontend React (Nginx, puerto 80) ────────────────────────────────────────
+  frontend:
+    build: ./front_despacho
+    container_name: innovatech-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - back-ventas
+      - back-despachos
+
+# ── Volúmenes ──────────────────────────────────────────────────────────────────
+volumes:
+  mysql_data:
+    # Docker administra este volumen; los datos persisten aunque el contenedor se elimine
