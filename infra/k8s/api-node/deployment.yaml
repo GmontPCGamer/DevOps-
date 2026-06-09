@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-node
+  namespace: innovatech
+  labels:
+    app: api-node
+    tier: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: api-node
+  template:
+    metadata:
+      labels:
+        app: api-node
+        tier: backend
+    spec:
+      containers:
+        - name: api-node
+          image: 402137994937.dkr.ecr.us-east-1.amazonaws.com/innovatech-api-node:latest
+          ports:
+            - containerPort: 3000
+
+          # Solo necesita variables no sensibles (no usa base de datos)
+          envFrom:
+            - configMapRef:
+                name: innovatech-config
+
+          livenessProbe:
+            httpGet:
+              path: /         # ajustar si hay un endpoint /health definido
+              port: 3000
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"

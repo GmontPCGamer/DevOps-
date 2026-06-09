@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: back-ventas
+  namespace: innovatech
+  labels:
+    app: back-ventas
+    tier: backend
+spec:
+  replicas: 3           # 3 réplicas = alta disponibilidad ante caída de nodos
+  selector:
+    matchLabels:
+      app: back-ventas
+  template:
+    metadata:
+      labels:
+        app: back-ventas
+        tier: backend
+    spec:
+      containers:
+        - name: back-ventas
+          image: 402137994937.dkr.ecr.us-east-1.amazonaws.com/innovatech-back-ventas:latest
+          ports:
+            - containerPort: 8080
+
+          # Variables sensibles desde Secret
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: innovatech-db-secret
+                  key: DB_PASSWORD
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: innovatech-db-secret
+                  key: DB_PASSWORD
+
+          # Variables no sensibles desde ConfigMap
+          envFrom:
+            - configMapRef:
+                name: innovatech-config
+
+          # Liveness: si falla, K8s reinicia el contenedor
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 3
+
+          # Readiness: K8s no envía tráfico hasta que Spring Boot esté listo
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 5
+
+          # Límites de recursos: evita que un Pod consuma todo el nodo
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"

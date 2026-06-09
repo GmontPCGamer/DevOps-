@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: innovatech-config
+  namespace: innovatech
+data:
+  # Base de datos
+  DB_ENDPOINT: "mysql"          
+  DB_PORT: "3306"
+  DB_NAME: "innovatech_db"
+  DB_USERNAME: "innovatech"
+
+
+  SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/innovatech_db?useSSL=false&serverTimezone=UTC&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true"
+
+  # API Node
+  NODE_ENV: "production"
+  PORT: "3000"

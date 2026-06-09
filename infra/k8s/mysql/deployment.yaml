@@ -1,0 +1,61 @@
+# ── MySQL — Deployment ────────────────────────────────────────────────────────
+# Una sola réplica. Usa emptyDir para el laboratorio académico.
+# En producción real se usaría AWS RDS en lugar de MySQL en K8s.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: innovatech
+  labels:
+    app: mysql
+    tier: database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+        tier: database
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          ports:
+            - containerPort: 3306
+
+          # Variables sensibles desde Secret
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: innovatech-db-secret
+                  key: MYSQL_ROOT_PASSWORD
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: innovatech-db-secret
+                  key: MYSQL_PASSWORD
+
+          # Variables no sensibles desde ConfigMap
+          envFrom:
+            - configMapRef:
+                name: innovatech-config
+
+          volumeMounts:
+            - name: mysql-storage
+              mountPath: /var/lib/mysql
+
+          # Verificación de salud: K8s no envía tráfico hasta que MySQL esté listo
+          readinessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "localhost"]
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 5
+
+      volumes:
+        - name: mysql-storage
+          emptyDir: {}    # suficiente para laboratorio; en producción usar RDS

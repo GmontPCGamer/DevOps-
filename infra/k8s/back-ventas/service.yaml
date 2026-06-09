@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: back-ventas
+  namespace: innovatech
+  labels:
+    app: back-ventas
+    tier: backend
+spec:
+  selector:
+    app: back-ventas
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: ClusterIP
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: back-ventas-hpa
+  namespace: innovatech
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: back-ventas
+  minReplicas: 2        # mínimo para alta disponibilidad
+  maxReplicas: 5        # máximo según los límites de AWS Academy
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70   # escala si el promedio de CPU supera 70%
