@@ -1,0 +1,61 @@
+﻿# ÔöÇÔöÇ MySQL ÔÇö Deployment ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+# Una sola r├®plica. Usa emptyDir para el laboratorio acad├®mico.
+# En producci├│n real se usar├¡a AWS RDS en lugar de MySQL en K8s.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: innovatech
+  labels:
+    app: mysql
+    tier: database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+        tier: database
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          ports:
+            - containerPort: 3306
+
+          # Variables sensibles desde Secret
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: innovatech-db-secret
+                  key: MYSQL_ROOT_PASSWORD
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: innovatech-db-secret
+                  key: MYSQL_PASSWORD
+
+          # Variables no sensibles desde ConfigMap
+          envFrom:
+            - configMapRef:
+                name: innovatech-config
+
+          volumeMounts:
+            - name: mysql-storage
+              mountPath: /var/lib/mysql
+
+          # Verificaci├│n de salud: K8s no env├¡a tr├ífico hasta que MySQL est├® listo
+          readinessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "localhost"]
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 5
+
+      volumes:
+        - name: mysql-storage
+          emptyDir: {}    # suficiente para laboratorio; en producci├│n usar RDS

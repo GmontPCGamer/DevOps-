@@ -1,0 +1,64 @@
+﻿apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: back-despachos
+  namespace: innovatech
+  labels:
+    app: back-despachos
+    tier: backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: back-despachos
+  template:
+    metadata:
+      labels:
+        app: back-despachos
+        tier: backend
+    spec:
+      containers:
+        - name: back-despachos
+          image: ${ECR_REGISTRY}/innovatech-poc-back-despachos:${IMAGE_TAG}
+          ports:
+            - containerPort: 8081
+
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: innovatech-db-secret
+                  key: DB_PASSWORD
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: innovatech-db-secret
+                  key: DB_PASSWORD
+
+          envFrom:
+            - configMapRef:
+                name: innovatech-config
+
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8081
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 5
+
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
