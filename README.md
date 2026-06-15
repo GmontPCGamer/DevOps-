@@ -1,78 +1,121 @@
-# 🚀 Pasos para la Ejecución del Proyecto DevOps en AWS
+# Innovatech Chile — DevOps EV3
 
-## 1. Clonar el repositorio
-
-```bash
-git clone <https://github.com/GmontPCGamer/DevOps-.git>
-cd "DevOps ev1"
-```
+Aplicacion full-stack desplegada en **Amazon EKS** con pipeline **CI/CD** automatizado.
 
 ---
 
-## 2. Configurar AWS CLI
+## Arquitectura
 
-> Debe estar previamente instalado en el PC donde se vaya a probar. 
-> Pedirá Access Key, Secret Key, Región y Formato (se obtiene de AWS Details).
-
-```bash
-aws configure
-```
+| Componente | Tecnologia | Puerto |
+|------------|------------|--------|
+| Frontend | React + Vite + Nginx | 80 |
+| Backend Ventas | Spring Boot | 8080 |
+| Backend Despachos | Spring Boot | 8081 |
+| API Node | Express | 3000 |
+| Base de datos | MySQL (K8s) | 3306 |
+| Orquestacion | Amazon EKS | — |
+| Imagenes | Amazon ECR | — |
 
 ---
 
-## 3. Inicializar Terraform
+## Despliegue con un solo comando (infraestructura)
 
 ```bash
 terraform init
-```
-
----
-
-## 4. Validar la configuración
-
-```bash
-terraform validate
-```
-
----
-
-## 5. Ver el plan de ejecución
-
-```bash
-terraform plan
-```
-
----
-
-## 6. Aplicar la infraestructura
-
-> Pedirá una confirmación, se debe escribir `yes`
-
-```bash
 terraform apply
 ```
 
+Recursos que crea Terraform:
+
+- VPC + subredes (incluye 2a subred publica para EKS en otra AZ)
+- Clúster **EKS** (`innovatech-cluster`) + node group
+- Repositorios **ECR** (`innovatech-poc-*`)
+- Instancias EC2 legacy (lift-and-shift)
+
+Conectar kubectl:
+
+```bash
+aws eks update-kubeconfig --name innovatech-cluster --region us-east-1
+kubectl get nodes
+```
+
 ---
 
-## 7. Verificar en la consola de AWS
+## Pipeline CI/CD — Punto 2
 
-- Que se haya creado la VPC, subredes, instancias EC2, NAT, etc.
+Archivo: `.github/workflows/deploy.yml`
+
+```
+Push → Compilar → Build Docker → Push ECR → kubectl apply EKS → Validar
+```
+
+Se ejecuta al hacer push a `main` o `deploy`.
+
+### Secrets requeridos (Settings → Secrets → Actions)
+
+| Secret | Descripcion |
+|--------|-------------|
+| `AWS_ACCESS_KEY_ID` | Credencial AWS Academy |
+| `AWS_SECRET_ACCESS_KEY` | Credencial AWS Academy |
+| `AWS_SESSION_TOKEN` | Token de sesion AWS Academy |
+| `AWS_ACCOUNT_ID` | ID de cuenta AWS (12 digitos) |
+
+### Despliegue manual (sin pipeline)
+
+```bash
+export ECR_REGISTRY="<ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com"
+export IMAGE_TAG="latest"
+./scripts/deploy-k8s.sh
+./scripts/validate-deployment.sh
+```
 
 ---
 
-## 8. Probar conectividad
+## Manifiestos Kubernetes
 
-- Obtener la IP pública de frontend (desde la consola AWS o salida de Terraform)
-- Probar acceso por SSH o HTTP
+Los deployments usan variables de imagen ECR:
+
+```yaml
+image: ${ECR_REGISTRY}/innovatech-poc-frontend:${IMAGE_TAG}
+```
+
+El script `deploy-k8s.sh` las sustituye con `envsubst` antes del `kubectl apply`.
 
 ---
 
-## 9. Destruir la infraestructura al terminar
+## Verificacion funcional
 
-> Se escribe `yes` para confirmar destrucción
+```bash
+kubectl get pods,svc -n innovatech
+kubectl get svc frontend -n innovatech -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+```
+
+---
+
+## Analisis del pipeline — Punto 3
+
+Ver documento: [`docs/PIPELINE-ANALISIS.md`](docs/PIPELINE-ANALISIS.md)
+
+---
+
+## Estructura
+
+```
+DevOps-/
+├── .github/workflows/deploy.yml   # Pipeline CI/CD
+├── infra/k8s/                     # Manifiestos Kubernetes
+├── scripts/deploy-k8s.sh            # Deploy a EKS
+├── scripts/validate-deployment.sh # Validacion post-deploy
+├── eks.tf                         # Cluster EKS (VPC de main.tf)
+├── ecr.tf                         # Repositorios ECR
+├── main.tf                        # VPC, EC2, red
+└── docs/PIPELINE-ANALISIS.md      # Analisis punto 3
+```
+
+---
+
+## Destruir infraestructura
 
 ```bash
 terraform destroy
 ```
-
----
