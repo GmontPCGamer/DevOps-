@@ -38,7 +38,8 @@ locals {
     var.extra_tags
   )
 
-  az_name = var.availability_zone != "" ? var.availability_zone : data.aws_availability_zones.available.names[0]
+  az_name   = var.availability_zone != "" ? var.availability_zone : data.aws_availability_zones.available.names[0]
+  az_name_2 = data.aws_availability_zones.available.names[1]
 
   use_instance_profile       = false
   instance_profile_arn_value = null
@@ -90,6 +91,19 @@ resource "aws_subnet" "private_backend_data" {
   })
 }
 
+# Segunda subred publica en otra AZ — requerida por EKS (minimo 2 subnets)
+resource "aws_subnet" "public_eks" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = var.public_subnet_eks_cidr
+  availability_zone       = local.az_name_2
+  map_public_ip_on_launch = true
+
+  tags = merge(local.common_tags, {
+    Name = "${var.project_name}-public-eks"
+    Tier = "eks"
+  })
+}
+
 resource "aws_eip" "nat_eip" {
   domain = "vpc"
 
@@ -124,6 +138,11 @@ resource "aws_route_table" "public_rt" {
 
 resource "aws_route_table_association" "public_assoc" {
   subnet_id      = aws_subnet.public_frontend.id
+  route_table_id = aws_route_table.public_rt.id
+}
+
+resource "aws_route_table_association" "public_eks_assoc" {
+  subnet_id      = aws_subnet.public_eks.id
   route_table_id = aws_route_table.public_rt.id
 }
 

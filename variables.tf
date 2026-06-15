@@ -34,6 +34,12 @@ variable "private_subnet_cidr" {
   default     = "10.0.2.0/24"
 }
 
+variable "public_subnet_eks_cidr" {
+  description = "Bloque CIDR para la segunda subred publica de EKS (otra AZ)."
+  type        = string
+  default     = "10.0.3.0/24"
+}
+
 variable "availability_zone" {
   description = "AZ fija opcional. Dejar vacio para elegir la primera disponible."
   type        = string
