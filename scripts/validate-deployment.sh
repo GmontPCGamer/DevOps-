@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# Valida que los servicios desplegados en EKS respondan correctamente.
+
+set -euo pipefail
+
+NAMESPACE="${K8S_NAMESPACE:-innovatech}"
+LB_TIMEOUT=300
+LB_INTERVAL=15
+ELAPSED=0
+
+echo "==> Validando pods en namespace ${NAMESPACE}..."
+kubectl get pods -n "${NAMESPACE}" -o wide
+
+FAILED_PODS=$(kubectl get pods -n "${NAMESPACE}" --field-selector=status.phase!=Running,status.phase!=Succeeded --no-headers 2>/dev/null | wc -l | tr -d ' ')
+if [ "${FAILED_PODS}" -gt 0 ]; then
+  echo "ERROR: Hay pods que no están en estado Running."
+  kubectl get pods -n "${NAMESPACE}"
+  exit 1
+fi
+
+echo "==> Validando health checks internos (port-forward)..."
+check_internal() {
+  local deployment="$1"
+  local port="$2"
+  local path="$3"
+
+  kubectl port-forward -n "${NAMESPACE}" "deployment/${deployment}" "${port}:${port}" &
+  local PF_PID=$!
+  sleep 5
+
+  local http_code
+  http_code=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${port}${path}" || echo "000")
+  kill "${PF_PID}" 2>/dev/null || true
+  wait "${PF_PID}" 2>/dev/null || true
+
+  if [ "${http_code}" -ge 200 ] && [ "${http_code}" -lt 400 ]; then
+    echo "  OK  ${deployment}${path} → HTTP ${http_code}"
+  else
+    echo "  FAIL ${deployment}${path} → HTTP ${http_code}"
+    return 1
+  fi
+}
+
+check_internal back-ventas 8080 /actuator/health
+check_internal back-despachos 8081 /actuator/health
+check_internal api-node 3000 /health
+check_internal frontend 80 /
+
+echo "==> Esperando Load Balancer del frontend (máx ${LB_TIMEOUT}s)..."
+LB_HOST=""
+while [ "${ELAPSED}" -lt "${LB_TIMEOUT}" ]; do
+  LB_HOST=$(kubectl get svc frontend -n "${NAMESPACE}" \
+    -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+  if [ -n "${LB_HOST}" ]; then
+    break
+  fi
+  sleep "${LB_INTERVAL}"
+  ELAPSED=$((ELAPSED + LB_INTERVAL))
+  echo "  Esperando LB... (${ELAPSED}s)"
+done
+
+if [ -z "${LB_HOST}" ]; then
+  echo "ADVERTENCIA: Load Balancer aún no tiene hostname. Validación interna OK."
+  exit 0
+fi
+
+echo "==> Load Balancer: http://${LB_HOST}"
+EXTERNAL_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "http://${LB_HOST}/" || echo "000")
+if [ "${EXTERNAL_CODE}" -ge 200 ] && [ "${EXTERNAL_CODE}" -lt 400 ]; then
+  echo "  OK  Frontend público → HTTP ${EXTERNAL_CODE}"
+else
+  echo "  FAIL Frontend público → HTTP ${EXTERNAL_CODE}"
+  exit 1
+fi
+
+echo "==> Validación funcional completada: commit → build → push → deploy → servicio operativo."
