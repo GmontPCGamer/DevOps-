@@ -21,30 +21,32 @@ fi
 echo "==> Validando health checks internos (port-forward)..."
 check_internal() {
   local deployment="$1"
-  local port="$2"
-  local path="$3"
+  local local_port="$2"
+  local container_port="$3"
+  local path="$4"
 
-  kubectl port-forward -n "${NAMESPACE}" "deployment/${deployment}" "${port}:${port}" &
+  kubectl port-forward -n "${NAMESPACE}" "deployment/${deployment}" "${local_port}:${container_port}" &
   local PF_PID=$!
   sleep 5
 
   local http_code
-  http_code=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${port}${path}" || echo "000")
+  http_code=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:${local_port}${path}" || echo "000")
   kill "${PF_PID}" 2>/dev/null || true
   wait "${PF_PID}" 2>/dev/null || true
 
   if [ "${http_code}" -ge 200 ] && [ "${http_code}" -lt 400 ]; then
-    echo "  OK  ${deployment}${path} → HTTP ${http_code}"
+    echo "  OK  ${deployment}${path} → HTTP ${http_code} (Mapped ${local_port}:${container_port})"
   else
     echo "  FAIL ${deployment}${path} → HTTP ${http_code}"
     return 1
   fi
 }
 
-check_internal back-ventas 8080 /actuator/health
-check_internal back-despachos 8081 /actuator/health
-check_internal api-node 3000 /health
-check_internal frontend 80 /
+# Mapeamos puertos locales > 1024 para evitar permisos de root
+check_internal back-ventas 8080 8080 /actuator/health
+check_internal back-despachos 8081 8081 /actuator/health
+check_internal api-node 3000 3000 /health
+check_internal frontend 8080 80 /
 
 echo "==> Esperando Load Balancer del frontend (máx ${LB_TIMEOUT}s)..."
 LB_HOST=""
