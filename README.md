@@ -1,4 +1,4 @@
-# 🚀 Pasos para la Ejecución del Proyecto DevOps en AWS
+# Pasos para la Ejecución del Proyecto DevOps en AWS
 
 ## 1. Clonar el repositorio
 
