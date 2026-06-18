@@ -65,18 +65,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Inject AWS Credentials
-        run: |
-          echo "AWS_ACCESS_KEY_ID=$(echo 'QVNJQVJJWlkyVElRRVVJTk0zV0Y=' | base64 -d)" >> $GITHUB_ENV
-          echo "AWS_SECRET_ACCESS_KEY=$(echo 'K2JxajJqVENpcmZPS2VNU3c2Nit1SkFJek0wV01uY3VjQzM2QTliMw==' | base64 -d)" >> $GITHUB_ENV
-          echo "AWS_SESSION_TOKEN=$(echo 'SVFvSmIzSnBaMmx1WDJWakVLRC8vLy8vLy8vLy93RWFDWFZ6TFhkbGMzUXRNaUpITUVVQ0lRRGV2WC9KU2U5N2o0dHdrdnBJeUE4Qml6VUF0SjVRdVM1ZkZXcHc1UkhGVmdJZ0Z4R1lScW9QajV4VDNnNldzbFZQeE0vMDZuMnlSWXliOTZrUExDcVhxWmdxcmdJSWFSQUFHZ3d3T0RjMk1qa3hOREkxTmpBaURIVktsdEQxRGxGTjFpWGxjU3FMQW9nQ2pucWd0QnNmUHF6UGZwbnZiMzFMU1ZPcmRYTnJCRGI2RmZoNDBIdkYwdEpnVk9xSEl4d2hPNVhQUk54U1dxUXp4SFhhL3VVWXZsLzFCZ1JYWStnQ3ZqUjAvRmdyNkVhSFZpTmphWVpmQTNSVnc0SVcxRk51eFVNbTEvN2w3bUUycUxHK0RJRzdVUFpkYXlQTFYrYldyL3J4VXM0RFIrSjlUU2JnbVhDWGVNU2M0OEdYUlFTbFRvOGkxeU02STJVQ2RnMFh0SkxYajFKWFBnS25zVzY2VTRCLzlKb0d2MW1GU3VxOGNpY21veXA3cnR0eENlUWhQM1kxeXZSZFN5MlhtWFBFci8vbW5CT0V3RmFMdGM3TXVpUUlOMlpFTC8vR1FnSGdYV1F2OVdBREhvVStSQjJlbWN6K1BiK3kzNmp4anJDVlZuaDBEaGdRYnlHRkdPcEFEU1psZG15VnVJODhWakQra3NMUkJqcWRBVnFKeVpmQTd6ZXJoOUtUMXFxNVE5ci8wTlRaazVwRms0Y0wzbDMvcWVVRm9DdXNoRFM2VndTRllvNVJoazFQOUx1a0JaeFZyUGNodjlsNGRpdk9pdkppQUFwRVlBTjlDaVcxMXNJcnI2VlI4VEF0REUzOFhxNkQ2TEFIQ09HSkY5RmlKWktWeG9QMWtFVm0yQUc4em9kR2dJeGEvTE9ESXZZbjRocEt4Rzl6SEsvUmZUc0ZBczJQRGJBOVdSa1djd1NBa1RYdVRGTzVqWGQ0OUVzPQ==' | base64 -d)" >> $GITHUB_ENV
-
       - name: Configurar credenciales AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ env.AWS_SESSION_TOKEN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
 
 
@@ -102,18 +96,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Inject AWS Credentials
-        run: |
-          echo "AWS_ACCESS_KEY_ID=$(echo 'QVNJQVJJWlkyVElRRVVJTk0zV0Y=' | base64 -d)" >> $GITHUB_ENV
-          echo "AWS_SECRET_ACCESS_KEY=$(echo 'K2JxajJqVENpcmZPS2VNU3c2Nit1SkFJek0wV01uY3VjQzM2QTliMw==' | base64 -d)" >> $GITHUB_ENV
-          echo "AWS_SESSION_TOKEN=$(echo 'SVFvSmIzSnBaMmx1WDJWakVLRC8vLy8vLy8vLy93RWFDWFZ6TFhkbGMzUXRNaUpITUVVQ0lRRGV2WC9KU2U5N2o0dHdrdnBJeUE4Qml6VUF0SjVRdVM1ZkZXcHc1UkhGVmdJZ0Z4R1lScW9QajV4VDNnNldzbFZQeE0vMDZuMnlSWXliOTZrUExDcVhxWmdxcmdJSWFSQUFHZ3d3T0RjMk1qa3hOREkxTmpBaURIVktsdEQxRGxGTjFpWGxjU3FMQW9nQ2pucWd0QnNmUHF6UGZwbnZiMzFMU1ZPcmRYTnJCRGI2RmZoNDBIdkYwdEpnVk9xSEl4d2hPNVhQUk54U1dxUXp4SFhhL3VVWXZsLzFCZ1JYWStnQ3ZqUjAvRmdyNkVhSFZpTmphWVpmQTNSVnc0SVcxRk51eFVNbTEvN2w3bUUycUxHK0RJRzdVUFpkYXlQTFYrYldyL3J4VXM0RFIrSjlUU2JnbVhDWGVNU2M0OEdYUlFTbFRvOGkxeU02STJVQ2RnMFh0SkxYajFKWFBnS25zVzY2VTRCLzlKb0d2MW1GU3VxOGNpY21veXA3cnR0eENlUWhQM1kxeXZSZFN5MlhtWFBFci8vbW5CT0V3RmFMdGM3TXVpUUlOMlpFTC8vR1FnSGdYV1F2OVdBREhvVStSQjJlbWN6K1BiK3kzNmp4anJDVlZuaDBEaGdRYnlHRkdPcEFEU1psZG15VnVJODhWakQra3NMUkJqcWRBVnFKeVpmQTd6ZXJoOUtUMXFxNVE5ci8wTlRaazVwRms0Y0wzbDMvcWVVRm9DdXNoRFM2VndTRllvNVJoazFQOUx1a0JaeFZyUGNodjlsNGRpdk9pdkppQUFwRVlBTjlDaVcxMXNJcnI2VlI4VEF0REUzOFhxNkQ2TEFIQ09HSkY5RmlKWktWeG9QMWtFVm0yQUc4em9kR2dJeGEvTE9ESXZZbjRocEt4Rzl6SEsvUmZUc0ZBczJQRGJBOVdSa1djd1NBa1RYdVRGTzVqWGQ0OUVzPQ==' | base64 -d)" >> $GITHUB_ENV
-
       - name: Configurar credenciales AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ env.AWS_SESSION_TOKEN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
 
 
@@ -144,18 +132,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Inject AWS Credentials
-        run: |
-          echo "AWS_ACCESS_KEY_ID=$(echo 'QVNJQVJJWlkyVElRRVVJTk0zV0Y=' | base64 -d)" >> $GITHUB_ENV
-          echo "AWS_SECRET_ACCESS_KEY=$(echo 'K2JxajJqVENpcmZPS2VNU3c2Nit1SkFJek0wV01uY3VjQzM2QTliMw==' | base64 -d)" >> $GITHUB_ENV
-          echo "AWS_SESSION_TOKEN=$(echo 'SVFvSmIzSnBaMmx1WDJWakVLRC8vLy8vLy8vLy93RWFDWFZ6TFhkbGMzUXRNaUpITUVVQ0lRRGV2WC9KU2U5N2o0dHdrdnBJeUE4Qml6VUF0SjVRdVM1ZkZXcHc1UkhGVmdJZ0Z4R1lScW9QajV4VDNnNldzbFZQeE0vMDZuMnlSWXliOTZrUExDcVhxWmdxcmdJSWFSQUFHZ3d3T0RjMk1qa3hOREkxTmpBaURIVktsdEQxRGxGTjFpWGxjU3FMQW9nQ2pucWd0QnNmUHF6UGZwbnZiMzFMU1ZPcmRYTnJCRGI2RmZoNDBIdkYwdEpnVk9xSEl4d2hPNVhQUk54U1dxUXp4SFhhL3VVWXZsLzFCZ1JYWStnQ3ZqUjAvRmdyNkVhSFZpTmphWVpmQTNSVnc0SVcxRk51eFVNbTEvN2w3bUUycUxHK0RJRzdVUFpkYXlQTFYrYldyL3J4VXM0RFIrSjlUU2JnbVhDWGVNU2M0OEdYUlFTbFRvOGkxeU02STJVQ2RnMFh0SkxYajFKWFBnS25zVzY2VTRCLzlKb0d2MW1GU3VxOGNpY21veXA3cnR0eENlUWhQM1kxeXZSZFN5MlhtWFBFci8vbW5CT0V3RmFMdGM3TXVpUUlOMlpFTC8vR1FnSGdYV1F2OVdBREhvVStSQjJlbWN6K1BiK3kzNmp4anJDVlZuaDBEaGdRYnlHRkdPcEFEU1psZG15VnVJODhWakQra3NMUkJqcWRBVnFKeVpmQTd6ZXJoOUtUMXFxNVE5ci8wTlRaazVwRms0Y0wzbDMvcWVVRm9DdXNoRFM2VndTRllvNVJoazFQOUx1a0JaeFZyUGNodjlsNGRpdk9pdkppQUFwRVlBTjlDaVcxMXNJcnI2VlI4VEF0REUzOFhxNkQ2TEFIQ09HSkY5RmlKWktWeG9QMWtFVm0yQUc4em9kR2dJeGEvTE9ESXZZbjRocEt4Rzl6SEsvUmZUc0ZBczJQRGJBOVdSa1djd1NBa1RYdVRGTzVqWGQ0OUVzPQ==' | base64 -d)" >> $GITHUB_ENV
-
       - name: Configurar credenciales AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ env.AWS_SESSION_TOKEN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ env.AWS_REGION }}
 
 
