@@ -47,7 +47,7 @@ wait_rollout mysql 300s
 wait_rollout back-ventas 600s
 wait_rollout back-despachos 600s
 wait_rollout api-node 180s
-wait_rollout frontend 180s
+wait_rollout frontend 300s
 
 echo "==> Despliegue completado."
 kubectl get pods,svc -n "${NAMESPACE}"
