@@ -15,6 +15,11 @@ terraform apply --auto-approve
 ```
 *(Tiempo estimado: ~15 minutos)*
 
+> **Nota:** Si el node group de EKS se elimina del estado de Terraform (ej: durante un `destroy` fallido) pero sigue existiendo en AWS, impórtalo nuevamente:
+> ```bash
+> terraform import aws_eks_node_group.innovatech_nodes innovatech-cluster:innovatech-nodes
+> ```
+
 ### Mitigación de Timeout en Node Group EKS
 Durante el aprovisionamiento inicial puede ocurrir que `terraform apply` exceda el tiempo de espera local mientras AWS completa el Managed Node Group (~10-12 min totales). Esto no es un error: el plano de control de EKS continúa su creación autónomamente. Para recuperar la consistencia del estado local:
 
@@ -47,6 +52,9 @@ Conectar tu terminal al clúster recién creado:
 ```bash
 aws eks update-kubeconfig --name innovatech-cluster --region us-east-1
 kubectl get nodes
+
+# Obtener la IP pública actual del frontend (puede cambiar tras reinicios)
+terraform output frontend_public_ip
 ```
 
 ---
@@ -116,3 +124,5 @@ Para no consumir más créditos de AWS Academy:
 ```bash
 terraform destroy --auto-approve
 ```
+
+> **Limitación conocida:** La política `voc-cancel-cred` del laboratorio AWS Academy puede bloquear operaciones de lectura necesarias para `terraform destroy` (EKS:DescribeCluster, ECR:DescribeRepositories, EC2:DescribeInstances, IAM:GetRole). Si el destroy falla, actualiza las credenciales AWS Academy e intenta nuevamente. Como workaround, los recursos pueden eliminarse manualmente desde la consola AWS.
