@@ -1,11 +1,13 @@
 # Innovatech Chile — DevOps EV3
 
-Guía rápida para la evaluación. Despliegue de aplicación full-stack en **Amazon EKS** con pipeline **CI/CD** automatizado.
+Guía de ejecución secuencial **End-to-End** para el despliegue full-stack en **Amazon EKS** con pipeline **CI/CD** automatizado. 
+Documenta el aprovisionamiento de infraestructura, la federación del plano de control, la verificación de la malla de aplicaciones y la extracción de endpoints dinámicos de la capa de servicios.
 
 ---
 
-## 1. Levantar Infraestructura (Terraform)
-Crea la red (VPC), clúster EKS y repositorios ECR.
+## ETAPA 1: PREPARACIÓN E INFRAESTRUCTURA BASE (Terraform)
+
+Crea la red (VPC), el clúster EKS y los repositorios ECR. Todos los valores de salida son dinámicos y se obtienen mediante `terraform output`.
 
 ```bash
 terraform init
@@ -15,12 +17,20 @@ terraform apply --auto-approve
 ```
 *(Tiempo estimado: ~15 minutos)*
 
-> **Nota:** Si el node group de EKS se elimina del estado de Terraform (ej: durante un `destroy` fallido) pero sigue existiendo en AWS, impórtalo nuevamente:
-> ```bash
-> terraform import aws_eks_node_group.innovatech_nodes innovatech-cluster:innovatech-nodes
-> ```
+### Verificación de Consistencia del Estado Local
+
+Si durante una ejecución previa el recurso `aws_eks_node_group.innovatech_nodes` fue removido del estado local 
+(p. ej. por un `terraform destroy` interrumpido) pero el Managed Node Group sigue existiendo en AWS, puedes reincorporarlo al `.tfstate`:
+
+```bash
+terraform import aws_eks_node_group.innovatech_nodes innovatech-cluster:innovatech-nodes
+```
+
+> **Nota:** Si el recurso ya se encuentra gestionado en el estado local, Terraform responderá con el error `"Resource already managed"`. 
+Esto es un **indicador positivo de consistencia** y protección del `.tfstate`; no requiere ninguna acción adicional.
 
 ### Mitigación de Timeout en Node Group EKS
+
 Durante el aprovisionamiento inicial puede ocurrir que `terraform apply` exceda el tiempo de espera local mientras AWS completa el Managed Node Group (~10-12 min totales). Esto no es un error: el plano de control de EKS continúa su creación autónomamente. Para recuperar la consistencia del estado local:
 
 ```bash
@@ -31,7 +41,7 @@ aws eks describe-nodegroup --cluster-name innovatech-cluster --nodegroup-name in
 # Sincronizar estado de Terraform con la infraestructura real
 terraform refresh
 
-# Confirmar que todos los recursos están registrados
+# Confirmar que todos los recursos (31) están registrados
 terraform state list
 
 # Conectarse al clúster y validar nodos listos
@@ -40,6 +50,7 @@ kubectl get nodes
 ```
 
 ### Secuencia Lógica de Aprovisionamiento
+
 Terraform respeta un orden de dependencias implícito y explícito que garantiza la integridad del despliegue bajo la estrategia **Lift-&-Shift** hacia AWS Academy con el LabRole corporativo:
 
 1. **Red Base** — VPC (`10.0.0.0/16`), subred pública frontend (`10.0.1.0/24`, us-east-1a), subred pública EKS (`10.0.3.0/24`, us-east-1b), subred privada backend/data (`10.0.2.0/24`, us-east-1a), Internet Gateway, NAT Gateway y Elastic IP.
@@ -48,51 +59,92 @@ Terraform respeta un orden de dependencias implícito y explícito que garantiza
 4. **Registros ECR** — 4 repositorios privados (`frontend`, `back-ventas`, `back-despachos`, `api-node`) creados en paralelo con el clúster EKS.
 5. **Orquestación EKS** — Clúster `innovatech-cluster` versión 1.32 con endpoint público. Una vez activo, se despliega el Managed Node Group con 2 nodos `t3.medium` (escalable entre 2 y 4) y sus reglas de autoscaling. El Log Group de CloudWatch (`/eks/innovatech-poc/applications`) completa el ciclo con retención de 7 días.
 
-Conectar tu terminal al clúster recién creado:
-```bash
-aws eks update-kubeconfig --name innovatech-cluster --region us-east-1
-kubectl get nodes
-
-# Obtener la IP pública actual del frontend (puede cambiar tras reinicios)
-terraform output frontend_public_ip
-```
-
 ---
 
-## 2. Actualizar Credenciales de AWS
-Las credenciales de AWS Academy expiran cada 4 horas. Antes de ejecutar el pipeline, actualízalas en GitHub:
-1. Ve a **Settings > Secrets and variables > Actions** en tu repositorio.
-2. Actualiza los siguientes secretos con los datos de tu *AWS Details*:
+## ETAPA 2: CONFIGURACIÓN Y CONEXIÓN AL PLANO DE CONTROL
+
+### Actualizar Credenciales de AWS en GitHub Actions
+
+Las credenciales de AWS Academy expiran cada 4 horas. Antes de ejecutar el pipeline, actualízalas en el repositorio:
+
+1. Ve a **Settings > Secrets and variables > Actions**.
+2. Actualiza los siguientes secretos con los valores de tu sesión *AWS Academy > AWS Details*:
    - `AWS_ACCESS_KEY_ID`
    - `AWS_SECRET_ACCESS_KEY`
    - `AWS_SESSION_TOKEN`
-   - `AWS_ACCOUNT_ID` (Tu ID de cuenta de 12 dígitos)
+   - `AWS_ACCOUNT_ID` (ID de cuenta de 12 dígitos)
 
----
+### Federación y Enlace al Clúster EKS
 
-## 3. Ejecutar Pipeline CI/CD (Despliegue)
-El pipeline compila el código, crea imágenes Docker, las sube a ECR y despliega en Kubernetes.
-
-1. Ve a la pestaña **Actions** en GitHub.
-2. Selecciona **Deploy Innovatech — EKS** en el menú izquierdo.
-3. Haz clic en **Run workflow** -> selecciona la rama `deploy` -> **Run workflow**.
-
-*(Tiempo estimado: ~10 minutos)*
-
----
-
-## 4. Verificar Despliegue
-Una vez que el pipeline termine con éxito, ejecuta:
+Configura `kubectl` y verifica que los nodos trabajadores estén operativos:
 
 ```bash
-# Ver que todos los servicios estén corriendo (Running)
+aws eks update-kubeconfig --name innovatech-cluster --region us-east-1
+kubectl get nodes
+```
+
+Los nodos deben figurar en estado `Ready` con la versión `v1.32.x-eks-...`. 
+Este comando no depende de valores estáticos; resuelve el endpoint del API server contra el plano de control de EKS en tiempo real.
+
+---
+
+## ETAPA 3: VERIFICACIÓN DEL DESPLIEGUE Y DESCUBRIMIENTO DE ENDPOINTS
+
+La capa de aplicación se despliega en el namespace `innovatech`. 
+Una vez que el pipeline CI/CD completa su ejecución, los pods y servicios están disponibles en el clúster.
+
+### Auditoría Global de la Malla de Servicios
+
+```bash
+# Ver pods y servicios del namespace de aplicación
 kubectl get pods,svc -n innovatech
 
-# Obtener la URL pública (Load Balancer) del Frontend para probar en el navegador
+# Mapear toda la arquitectura de red interna y externa del clúster
+kubectl get svc --all-namespaces
+```
+
+### Endpoint del Frontend (LoadBalancer)
+
+El servicio `frontend` expone la aplicación al exterior mediante un Elastic Load Balancer (ELB) de AWS. Para obtener la URL de acceso:
+
+```bash
 kubectl get svc frontend -n innovatech -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
 ```
 
+> **Clave técnica:** Este comando **no retorna una IP estática**. 
+Interroga a la API de Kubernetes para arrojar la **URL DNS dinámica** generada por el ELB de AWS, con la estructura `*.us-east-1.elb.amazonaws.com`. 
+Esta URL varía en cada despliegue o laboratorio de AWS Academy y representa el punto de entrada único en el puerto 80 para consumir la aplicación desde el navegador o mediante `curl`.
+
+```bash
+# Ejemplo de uso de la URL dinámica
+FRONTEND_URL=$(kubectl get svc frontend -n innovatech -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+curl -I "http://${FRONTEND_URL}"
+```
+
+### Microservicios Internos (ClusterIP)
+
+Los microservicios que actúan detrás del API Gateway o balanceador están aislados mediante políticas **ClusterIP**, lo que restringe su acceso exclusivamente al plano de red interno de EKS. 
+No responden a comandos ICMP (ping) por restricciones de seguridad perimetral.
+
+| Servicio | Puerto Interno | Tipo | Acceso |
+|---|---|---|---|
+| `api-node` | 3000 | ClusterIP | Solo interno EKS |
+| `back-ventas` | 8080 | ClusterIP | Solo interno EKS |
+| `back-despachos` | 8081 | ClusterIP | Solo interno EKS |
+| `mysql` | 3306 | ClusterIP | Solo interno EKS |
+
+Para verificar la resolución interna desde un pod efímero:
+
+```bash
+kubectl run -n innovatech --rm -it test-pod --image=busybox -- sh
+# Dentro del pod:
+wget -qO- http://api-node:3000/health
+wget -qO- http://back-ventas:8080/health
+ping api-node  # No responderá (política ClusterIP + restricción ICMP)
+```
+
 ### Comandos de Verificación por CLI
+
 Para validar la infraestructura base independientemente del estado de la capa de aplicación:
 
 ```bash
@@ -103,26 +155,33 @@ kubectl get nodes
 aws logs describe-log-groups --log-group-name-prefix "/eks/innovatech-poc" --region us-east-1
 
 # Confirmar login a los repositorios ECR
-aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 339712887424.dkr.ecr.us-east-1.amazonaws.com
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $(terraform output -raw ecr_frontend_url | cut -d'/' -f1)
 
 # Consultar outputs del estado de Terraform
 terraform output
 ```
 
-*(Nota técnica: El Log Group puede mostrar 0 bytes almacenados si no se han desplegado agentes recolectores o pods en el clúster. Los mensajes visuales como "Failed to load tag-based configurations" en la consola web son propios de las restricciones de la política `voc-cancel-cred` del laboratorio AWS Academy y no representan fallas en la configuración del recurso. La API por CLI responde correctamente.)*
+*(Nota técnica: El Log Group puede mostrar 0 bytes almacenados si no se han desplegado agentes recolectores o pods en el clúster. 
+Los mensajes visuales como "Failed to load tag-based configurations" en la consola web son propios de las restricciones de la política `voc-cancel-cred` del laboratorio AWS Academy y no representan fallas en la configuración del recurso. 
+La API por CLI responde correctamente.)*
 
 ---
 
-## 5. Análisis del Pipeline (Evaluación y Mejora)
-Para la parte teórica de la evaluación, los tiempos, optimizaciones implementadas y oportunidades de mejora están documentados en:
-**[Ver Documento de Análisis (docs/PIPELINE-ANALISIS.md)](docs/PIPELINE-ANALISIS.md)**
+## ETAPA 4: CIERRE Y DESTRUCCIÓN
 
----
+### Destruir Infraestructura
 
-## 6. Destruir Infraestructura (Al finalizar)
-Para no consumir más créditos de AWS Academy:
+Para no consumir más créditos de AWS Academy al finalizar la evaluación:
+
 ```bash
 terraform destroy --auto-approve
 ```
 
-> **Limitación conocida:** La política `voc-cancel-cred` del laboratorio AWS Academy puede bloquear operaciones de lectura necesarias para `terraform destroy` (EKS:DescribeCluster, ECR:DescribeRepositories, EC2:DescribeInstances, IAM:GetRole). Si el destroy falla, actualiza las credenciales AWS Academy e intenta nuevamente. Como workaround, los recursos pueden eliminarse manualmente desde la consola AWS.
+> **Limitación conocida:** La política `voc-cancel-cred` del laboratorio AWS Academy puede bloquear las operaciones de lectura necesarias para que Terraform planifique el destroy 
+(`eks:DescribeCluster`, `ecr:DescribeRepositories`, `ec2:DescribeInstances`, `iam:GetRole`, `logs:DescribeLogGroups`). 
+Si el comando falla, renueva las credenciales AWS Academy e intenta nuevamente. Como workaround, los recursos pueden eliminarse manualmente desde la consola AWS.
+
+### Documentación Complementaria
+
+El análisis detallado del pipeline CI/CD (tiempos, optimizaciones implementadas y oportunidades de mejora) está disponible en:
+**[docs/PIPELINE-ANALISIS.md](docs/PIPELINE-ANALISIS.md)**
